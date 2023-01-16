@@ -1,8 +1,8 @@
 {
-  "name": "ha-sip",
+  "name": "ze-sip-doorbell-card",
   "version": "1.0.0",
   "description": "A SIP client inside home assistant!",
-  "main": "sipjs-card.js",
+  "main": "ze-sip-doorbell-card.js",
   "scripts": {
     "build": "webpack --progress --config webpack.config.js --mode production"
   },
@@ -14,12 +14,12 @@
     "sip",
     "home-assistant"
   ],
-  "author": "Jordy Kuhne",
+  "author": "Jordy Kuhne edited by Ze",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/TECH7Fox/HA-SIP/issues"
+    "url": "https://github.com/jo4santos/ze-sip-doorbell-card/issues"
   },
-  "homepage": "https://github.com/TECH7Fox/HA-SIP#readme",
+  "homepage": "https://github.com/jo4santos/ze-sip-doorbell-card#readme",
   "devDependencies": {
     "ts-loader": "^9.2.7",
     "tslib": "^2.3.1",

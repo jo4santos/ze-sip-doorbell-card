@@ -8,13 +8,10 @@ import {
   css,
   unsafeCSS
 } from "lit";
-import "./editor";
 import { customElement } from "lit/decorators.js";
-import "./audioVisualizer";
-import { AudioVisualizer } from "./audioVisualizer";
 
-@customElement('sipjs-card')
-class SipJsCard extends LitElement {
+@customElement('ze-sip-doorbell-card')
+class ZeSipDoorbellCard extends LitElement {
     sipPhone: UA | undefined;
     sipPhoneSession: RTCSession | null;
     sipCallOptions: any;
@@ -24,14 +21,16 @@ class SipJsCard extends LitElement {
     timerElement: string = "00:00";
     renderRoot: any;
     popup: boolean = false;
-    currentCamera: any;
     intervalId!: number;
     error: any = null;
-    audioVisualizer: any;
     callStatus: string = "Idle";
     user_extension: string = "None";
     card_title: string = "Unknown";
     connected: boolean = false;
+    
+    doorbellCamera: any;
+    secondaryCamera: any;
+    pickupExtension: any;
 
     constructor() {
         super();
@@ -46,7 +45,8 @@ class SipJsCard extends LitElement {
                 type: Boolean
             },
             timerElement: {},
-            currentCamera: {}
+            doorbellCamera: {},
+            secondaryCamera: {}
         };
     }
 
@@ -219,25 +219,7 @@ class SipJsCard extends LitElement {
                 --mdc-dialog-content-ink-color: var(--primary-text-color);
                 --justify-action-buttons: space-between;
             }
-
-            #audioVisualizer {
-                min-height: 20em;
-                height: 100%;
-                white-space: nowrap;
-                align-items: center;
-                display: flex;
-                justify-content: center;
-            }
-
-            #audioVisualizer div {
-                display: inline-block;
-                width: 3px;
-                height: 100px;
-                margin: 0 7px;
-                background: currentColor;
-                transform: scaleY( .5 );
-                opacity: .25;
-            }
+            
             ha-header-bar {
                 --mdc-theme-on-primary: var(--primary-text-color);
                 --mdc-theme-primary: var(--mdc-theme-surface);
@@ -354,19 +336,7 @@ class SipJsCard extends LitElement {
                             <span slot="actionItems" id="time" class="header-text">${this.timerElement}</span>
                         </ha-header-bar>
                     </div>
-                    <div class="content"> 
-                        ${this.currentCamera !== undefined ? html`
-                            <ha-camera-stream
-                                allow-exoplayer
-                                muted
-                                .hass=${this.hass}
-                                .stateObj=${this.hass.states[this.currentCamera]}
-                            ></ha-camera-stream>
-                        ` : html`
-                            <div id="audioVisualizer" style="display:${this.config.video ? "none": "flex"}"></div>
-                            <video poster="noposter" style="display:${this.config.video ? "block": "none"}" playsinline id="remoteVideo"></video>
-                            <audio id="remoteAudio" style="display:none"></audio>
-                        `}
+                    <div class="content">
                         <div class="box">
                             <div class="row">
                                 <ha-icon-button
@@ -382,35 +352,6 @@ class SipJsCard extends LitElement {
                                     @click="${this._toggleMuteAudio}"
                                     ><ha-icon id="muteaudio-icon" icon="hass:microphone"></ha-icon>
                                 </ha-icon-button>
-                                <ha-icon-button style="display:${this.config.video ? "block": "none"}"
-                                    .label=${"Mute video"}
-                                    @click="${this._toggleMuteVideo}"
-                                    ><ha-icon id="mutevideo-icon" icon="${this.config.video ? "hass:video" : "hass:video-off"}"></ha-icon>
-                                </ha-icon-button>
-                            </div>
-                            <div class="row">
-                                ${this.config.dtmfs ?
-                                    this.config.dtmfs.map((dtmf: { signal: any; name: any; icon: any; }) => {
-                                        return html `
-                                            <ha-icon-button
-                                                @click="${() => this._sendDTMF(dtmf.signal)}"
-                                                .label="${dtmf.name}"
-                                                ><ha-icon icon="${dtmf.icon}"></ha-icon>
-                                            </ha-icon-button>
-                                        `;
-                                    }) : ""
-                                }
-                                ${this.config.buttons ?
-                                    this.config.buttons.map((button: { entity: any; name: any; icon: any; }) => {
-                                        return html `
-                                            <ha-icon-button
-                                                @click="${() => this._button(button.entity)}"
-                                                .label="${button.name}"
-                                                ><ha-icon icon="${button.icon}"></ha-icon>
-                                            </ha-icon-button>
-                                        `;
-                                    }) : ""
-                                }
                             </div>
                             <div class="row">
                                 <ha-icon-button
@@ -430,6 +371,23 @@ class SipJsCard extends LitElement {
                         <span id="extension" style="color: ${this.getConnectionCSS()};">${this.user?.extension}</span>
                     </h1>
                     <div class="wrapper">
+
+                        <mwc-button @click="${() => this._call(this.config.pickupExtension)}">ATENDER</mwc-button>
+
+                        <ha-camera-stream
+                            allow-exoplayer
+                            muted
+                            .hass=${this.hass}
+                            .stateObj=${this.hass.states[this.config.doorbellCamera]}
+                        ></ha-camera-stream>
+                        
+                        <ha-camera-stream
+                            allow-exoplayer
+                            muted
+                            .hass=${this.hass}
+                            .stateObj=${this.hass.states[this.config.secondaryCamera]}
+                        ></ha-camera-stream>
+
                         ${(this.error !== null) ? html`
                             <ha-alert alert-type="error" .title=${this.error.title}>
                                 ${this.error.message}
@@ -438,62 +396,9 @@ class SipJsCard extends LitElement {
                         }
 
                         ${this.config.extensions.map((extension: { entity: string | number; person: string | number; icon: any; name: any; extension: any; camera: any; }) => {
-                            var stateObj = this.hass.states[extension.entity];
                             var isMe = (this.hass.user.id == this.hass.states[extension.person].attributes.user_id);
                             if (isMe) this.user = extension;
-                            if (!(isMe && this.config.hide_me)) {
-                                return html`
-                                    <div class="flex">
-                                        <state-badge
-                                            .stateObj=${stateObj}
-                                            .overrideIcon=${extension.icon}
-                                            .stateColor=${this.config.state_color}
-                                        ></state-badge>
-                                        <div class="info">${extension.name}</div>
-                                        <mwc-button @click="${() => this._call(extension.extension, extension.camera)}">CALL</mwc-button>
-                                    </div>
-                                `;
-                            }
                         })}
-
-                        ${this.config.custom ?
-                            this.config.custom.map((custom: { entity: string | number; icon: any; name: any; number: any; camera: any; edit: any;}) => {
-                                var stateObj = this.hass.states[custom.entity];
-                                var nameid = "custom_" + custom.name.toLowerCase().split(' ').join('_');;
-                                if (custom.edit){
-                                    return html`
-                                        <div class="flex">
-                                            <state-badge
-                                                .stateObj=${stateObj}
-                                                .overrideIcon=${custom.icon}
-                                                .stateColor=${this.config.state_color}
-                                            ></state-badge>
-                                            <ha-textfield
-                                                id="${nameid}"
-                                                .value=${custom.number}
-                                                .label=${custom.name}
-                                                type="text"
-                                                .inputmode="text"
-                                                class="editField"
-                                            ></ha-textfield>
-                                            <mwc-button @click="${() => this._custom_call(nameid, custom.camera)}">CALL</mwc-button>
-                                        </div>
-                                    `;
-                                } else {
-                                    return html`
-                                        <div class="flex">
-                                            <state-badge
-                                                .stateObj=${stateObj}
-                                                .overrideIcon=${custom.icon}
-                                                .stateColor=${this.config.state_color}
-                                            ></state-badge>
-                                            <div class="info">${custom.name}</div>
-                                            <mwc-button @click="${() => this._call(custom.number, custom.camera)}">CALL</mwc-button>
-                                        </div>
-                                    `;
-                                }
-                            }) : ""
-                        }
 
                     </div>
                 </ha-card>
@@ -503,7 +408,6 @@ class SipJsCard extends LitElement {
 
     firstUpdated() {
         this.popup = false;
-        this.currentCamera = undefined;
         this.connect();
     }
 
@@ -518,10 +422,6 @@ class SipJsCard extends LitElement {
             throw new Error("You need to define at least one extension!");
         }
         this.config = config;
-    }
-
-    static async getConfigElement() {
-        return document.createElement("sipjs-card-editor");
     }
 
     static getStubConfig() {
@@ -589,21 +489,13 @@ class SipJsCard extends LitElement {
         }
     }
 
-    async _call(extension: string | null, camera: any) {
+    async _call(extension: string | null) {
         this.openPopup();
         this.ring("ringbacktone");
         this.setCallStatus("Calling...");
-        this.currentCamera = (camera ? camera : undefined);
         if (this.sipPhone) {
             this.sipPhone.call("sip:" + extension + "@" + this.config.server, this.sipCallOptions);
         }
-    }
-
-    async _custom_call(nameid: string | null, camera: any) {
-        console.log(this.renderRoot.querySelector('#' + nameid));
-        var number = this.renderRoot.querySelector('#' + nameid).value;
-        console.log("Trying to custom call this: " + number);
-        this._call(number, camera);
     }
 
     async _answer() {
@@ -622,17 +514,6 @@ class SipJsCard extends LitElement {
         else {
             this.sipPhoneSession?.mute({ video: false, audio: true });
             this.renderRoot.querySelector('#muteaudio-icon').icon = "hass:microphone-off";
-        }
-    }
-
-    async _toggleMuteVideo() {
-        if (this.sipPhoneSession?.isMuted().video) {
-            this.sipPhoneSession?.unmute({ video:true, audio: false });
-            this.renderRoot.querySelector('#mutevideo-icon').icon = "hass:video";
-        }
-        else {
-            this.sipPhoneSession?.mute({ video:true, audio: false });
-            this.renderRoot.querySelector('#mutevideo-icon').icon = "hass:video-off";
         }
     }
 
@@ -676,16 +557,10 @@ class SipJsCard extends LitElement {
     }
 
     endCall() {
-        if (!this.config.video && this.currentCamera == undefined && this.audioVisualizer !== undefined) {
-            this.audioVisualizer.stop();
-            this.renderRoot.querySelector('#audioVisualizer').innerHTML = '';
-            this.audioVisualizer = undefined;
-        }
         this.ring("pause");
         this.setCallStatus("Idle");
         clearInterval(this.intervalId);
         this.timerElement = "00:00";
-        this.currentCamera = undefined;
         this.closePopup();
         this.sipPhoneSession = null;
     }
@@ -727,22 +602,6 @@ class SipJsCard extends LitElement {
             mediaConstraints: { audio: true, video: this.config.video },
             rtcOfferConstraints: { offerToReceiveAudio: true, offerToReceiveVideo: this.config.video },
             pcConfig: this.config.iceConfig // we just use the config that directly comes from the YAML config in the YAML card config.
-            /* EXAMPLE config
-            {
-                iceCandidatePoolSize: 0,   //  prefetched ICE candidate pool. The default value is 0 (meaning no candidate prefetching will occur).
-                iceTransportPolicy: 'all', // 'relay' is also allowed, i.e. only candidates from TURN-servers
-                iceServers: [
-                    {
-                        // Google STUN servers
-                        urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'],
-                        //credentialType: 'password',
-                        //username: 'myusername',
-                        //credential: 'mypassword'
-                    }
-                ],
-                rtcpMuxPolicy: 'require' // RTP and RTCP will be muxed
-            }
-            */
         };
 
         console.log('ICE config: ' + JSON.stringify(this.sipCallOptions.pcConfig, null, 2));
@@ -813,9 +672,8 @@ class SipJsCard extends LitElement {
 
             this.sipPhoneSession.on("accepted", (event: IncomingEvent | OutgoingEvent) => {
                 console.log('Call accepted. Originator: ' + event.originator);
-                if (!this.config.video && this.currentCamera == undefined) {
+                if (!this.config.video) {
                     let remoteAudio = this.renderRoot.querySelector("#remoteAudio");
-                    this.audioVisualizer = new AudioVisualizer(this.renderRoot, remoteAudio.srcObject, 16);
                 }
                 this.ring("pause");
                 if (this.sipPhoneSession?.remote_identity) {
@@ -910,20 +768,6 @@ class SipJsCard extends LitElement {
             // Typescript types for enums seem to be broken for JsSIP.
             // See: https://github.com/versatica/JsSIP/issues/750
             if (this.sipPhoneSession.direction === 'incoming') {
-                var extension = this.sipPhoneSession.remote_identity.uri.user;
-                this.config.extensions.forEach((element: { extension: any; camera: boolean; }) => {
-                    if (element.extension == extension) {
-                        this.currentCamera = (element.camera ? element.camera : undefined);
-                    }
-                });
-                if(typeof this.config.custom !== 'undefined') {
-                  this.config.custom.forEach((element: { number: any; camera: boolean; }) => {
-                      if (element.number == extension) {
-                          this.currentCamera = (element.camera ? element.camera : undefined);
-                      }
-                  });
-                }
-
                 this.sipPhoneSession.on("peerconnection", (event: PeerConnectionEvent) => {
                     console.log('Call: peerconnection(incoming)');
 
@@ -958,19 +802,13 @@ class SipJsCard extends LitElement {
                 console.log('Call: direction was neither incoming or outgoing!');
             }
         });
-
-        var urlParams = new URLSearchParams(window.location.search);
-        if (urlParams.get('call')) {
-            this.openPopup();
-            this._call(urlParams.get('call'), undefined); // TODO: Add camera here or in the _call function itself.
-        }
     }
 }
 
 (window as any).customCards = (window as any).customCards || [];
 (window as any).customCards.push({
-    type: "sipjs-card",
-    name: "SIP Card",
+    type: "ze-sip-doorbell-card",
+    name: "Ze Doorbell Card",
     preview: false,
-    description: "A SIP card, made by Jordy Kuhne."
+    description: "A SIP card, made by Jordy Kuhne and edited by Ze."
 });

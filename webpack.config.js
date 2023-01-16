@@ -2,7 +2,7 @@ const path = require('path');
 
 module.exports = {
   entry: {
-    'sipjs-card': './src/sipjs-card.ts'
+    'ze-sip-doorbell-card': './src/ze-sip-doorbell-card.ts'
   },
   devtool: 'inline-source-map',
   mode: 'development',
