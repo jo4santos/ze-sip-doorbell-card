@@ -31,6 +31,9 @@ class ZeSipDoorbellCard extends LitElement {
     doorbellCamera: any;
     secondaryCamera: any;
     pickupExtension: any;
+    ringStateEntity: any;
+    callStateEntity: any;
+    gateEntity: any;
 
     constructor() {
         super();
@@ -372,7 +375,28 @@ class ZeSipDoorbellCard extends LitElement {
                     </h1>
                     <div class="wrapper">
 
-                        <mwc-button @click="${() => this._call(this.config.pickupExtension)}">ATENDER</mwc-button>
+                        <table>
+                        <tr><th>Título</th><td>${this.config.title}</td><td></td></tr>
+                        <tr><th>Toque</th><td>${this.config.ringStateEntity}</td><td>${this.hass.states[this.config.ringStateEntity].state}</td></tr>
+                        <tr><th>Chamada</th><td>${this.config.callStateEntity}</td><td>${this.hass.states[this.config.callStateEntity].state}</td></tr>
+                        </table>
+
+                        ${this.hass.states[this.config.ringStateEntity].state === "on" ? html`
+                            <ha-alert alert-type="error" .title="Campainha Traseiras a tocar!!">
+                                A Campainha está a tocar
+                            </ha-alert>
+                        ` : html ``}
+
+                        ${this.hass.states[this.config.callStateEntity].state === "on" ? html`
+                            <ha-alert alert-type="success" .title="Campainha Traseiras em chamada">
+                                A Campainha está em chamada
+                            </ha-alert>
+                        ` : html ``}
+
+                        <mwc-button raised @click="${() => this._call(this.config.pickupExtension)}">ATENDER</mwc-button>
+                        <mwc-button raised @click="${() => this._button(this.config.gateEntity)}">ABRIR PORTAO</mwc-button>
+                        <mwc-button raised>MUTE</mwc-button>
+                        <mwc-button raised>DESLIGAR</mwc-button>
 
                         <ha-camera-stream
                             allow-exoplayer
