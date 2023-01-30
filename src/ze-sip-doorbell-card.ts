@@ -89,10 +89,6 @@ class ZeSipDoorbellCard extends LitElement {
             margin-right: 8px;
           }
 
-          ha-card {
-            cursor: pointer;
-          }
-
           .good {
             color: var(--label-badge-green);
           }
@@ -120,33 +116,6 @@ class ZeSipDoorbellCard extends LitElement {
             width: 100%;
           }
 
-          .box {
-            /* start paper-font-common-nowrap style */
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            /* end paper-font-common-nowrap style */
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background-color: var(--ha-picture-card-background-color,
-            rgba(0, 0, 0, 0.3));
-            padding: 4px 8px;
-            font-size: 16px;
-            line-height: 40px;
-            color: var(--ha-picture-card-text-color, white);
-            display: flex;
-            justify-content: space-between;
-            flex-direction: row;
-            margin-top: -70px;
-            min-height: 62px;
-          }
-
-          .box .title {
-            font-weight: 500;
-            margin-left: 8px;
-          }
-
           .row {
             display: flex;
             flex-direction: row;
@@ -157,18 +126,20 @@ class ZeSipDoorbellCard extends LitElement {
             width: 80vw;
           }
 
-          .box,
           ha-icon {
             display: flex;
             align-items: center;
+            margin: 0 5px;
           }
 
           .accept-btn {
-            color: var(--label-badge-green);
+            background: var(--label-badge-green)!important;
+            color: #fff!important;
           }
 
           .hangup-btn {
-            color: var(--label-badge-red);
+            background: var(--label-badge-red)!important;
+            color: #fff!important;
           }
 
           #time,
@@ -322,20 +293,120 @@ class ZeSipDoorbellCard extends LitElement {
             left: 0;
             right: 0;
             background: #000;
+            border-radius: 0px;
           }
 
-          .primary-camera {
-            position: absolute;
+          .primary-camera-container {
+            position: fixed;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            display: flex;
+            align-items: center;
           }
 
           .secondary-camera {
             position: absolute;
             width: 25%;
-            right: 20px;
-            margin-top: 20px;
+            right: 10px;
             border: solid 3px #fff;
             border-radius: 10px;
             overflow: hidden;
+            top: 30px;
+          }
+
+          .ze-main-button-container {
+            position: fixed;
+            bottom: 0px;
+            left: 0px;
+            right: 0px;
+            display: flex;
+            justify-content: space-between;
+            z-index: 100;
+            background: rgba(0, 0, 0, 1);
+            padding: 10px;
+          }
+
+          .ze-secondary-button-container {
+            position: absolute;
+            left: 10px;
+            top: 30px;
+            z-index: 10;
+          }
+
+          .ze-secondary-button-container button,
+          .ze-main-button-container button {
+            height: 60px;
+            border: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 16px;
+            box-shadow: 1px 1px 4px rgb(0 0 0 / 20%);
+            background: #dddddd;
+            color: #212121;
+          }
+
+          .ze-secondary-button-container button[disabled],
+          .ze-main-button-container button[disabled] {
+            pointer-events: none;
+            opacity: 0;
+          }
+
+          .ze-main-button-container button {
+            width: 32%;
+            z-index: 1000;
+            position: relative;
+          }
+
+          .ze-secondary-button-container button {
+            padding: 0px 15px;
+            margin-bottom: 10px;
+            display: flex;
+          }
+          
+          .ze-main-alert-container {
+            position: absolute;
+            left: 10px;
+            right: 10px;
+            bottom: 90px;
+            z-index: 10;
+            text-align: center;
+          }
+          
+          .ze-alert {
+            background: #db4437;
+            color: #fff;
+            display: inline-flex;
+            padding: 8px 50px;
+            opacity: .8;
+            border-radius: 10px;
+            align-items: center;
+            font-size:16px;
+          }
+
+          .ze-alert.info {
+            background: #0288d1;
+          }
+          
+          .ze-main-title {
+            position: absolute;
+            top: 0px;
+            left: 0px;
+            right: 0px;
+            height: 30px;
+            font-size: 20px;
+            font-weight: bold;
+            color: rgb(255, 255, 255);
+            background: #000;
+            z-index: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
           }
         `;
     }
@@ -347,7 +418,7 @@ class ZeSipDoorbellCard extends LitElement {
             <audio id="toneAudio" style="display:none" loop controls></audio>
             <audio id="remoteAudio" style="display:none"></audio>
             <ha-card>
-                <h1 class="card-header">
+                <h1 class="card-header" style="display: none">
                     <span id="title" class="name">${this.getTitle()}</span>
                     <span id="extension" style="color: ${this.getConnectionCSS()};"
                     >${this.user?.extension}</span
@@ -355,9 +426,8 @@ class ZeSipDoorbellCard extends LitElement {
                 </h1>
                 <div
                         class="wrapper"
-                        style="background: url({{state_attr('${this.config.doorbellCamera}','entity_picture')}});"
                 >
-                    <table>
+                    <table style="display: none">
                         <tr>
                             <th>Título</th>
                             <td>${this.config.title}</td>
@@ -385,67 +455,87 @@ class ZeSipDoorbellCard extends LitElement {
                         </tr>
                     </table>
 
-                    ${this.hass.states[this.config.ringStateEntity].state === "on"
+                    <div class="ze-main-title">
+                        ${this.config.title}
+                    </div>
+                    <div class="ze-main-alert-container">
+                    ${this.hass.states[this.config.ringStateEntity].state === "on" && this.hass.states[this.config.callStateEntity].state === "off"
                             ? html`
-                                <ha-alert
-                                        alert-type="error"
-                                        .title="Campainha Traseiras a tocar!!"
+                                <div
+                                        class="ze-alert"
                                 >
-                                    A Campainha está a tocar
-                                </ha-alert>
+                                    <ha-icon icon="hass:alert-circle-outline"></ha-icon> A Campainha está a tocar
+                                </div>
                             `
                             : html``}
                     ${this.hass.states[this.config.callStateEntity].state === "on"
                             ? html`
-                                <ha-alert
-                                        alert-type="success"
-                                        .title="Campainha Traseiras em chamada"
+                                <div
+                                        class="ze-alert info"
                                 >
-                                    A Campainha está em chamada
-                                </ha-alert>
+                                    <ha-icon icon="hass:information-outline"></ha-icon> A Campainha está em chamada
+                                </div>
                             `
                             : html``}
+                    </div>
 
-                    <div>
-                        <mwc-button
-                                raised
+                    <div class="ze-main-button-container">
+                        <button
+                                class="accept-btn"
                                 @click="${() => this._call(this.config.pickupExtension)}"
+                                ?disabled=${this._acceptDisabled()}
                         >
-                            <ha-icon icon="hass:phone"></ha-icon>
-                            ATENDER
-                        </mwc-button
+                            <ha-icon icon="hass:phone"></ha-icon> ATENDER
+                        </button
                         >
-                        <mwc-button
-                                raised
-                                @click="${() => this._button(this.config.gateEntity)}"
-                        >ABRIR PORTAO
-                        </mwc-button
-                        >
-                        <mwc-button raised
-                                    @click="${() => this._toggleMuteAudio()}"
-                        >
-                            <ha-icon id="muteaudio-icon" icon="hass:microphone"></ha-icon>
-                            MUTE
-                            AUDIO
-                        </mwc-button
-                        >
-                        <mwc-button raised @click="${this._ignore}">IGNORAR</mwc-button>
 
-                        <mwc-button raised @click="${this._hangup}"
+
+                        ${this.hass.states[this.config.ringStateEntity].state === "on" && this.hass.states[this.config.callStateEntity].state === "off"
+                                ? html`
+                                    <button  @click="${this._ignore}">
+                                        <ha-icon icon="hass:volume-off"></ha-icon>
+                                        IGNORAR</button>
+                                `
+                                : html``}
+
+                        ${this.sipPhoneSession
+                                ? html`
+                                    <button 
+                                                @click="${() => this._toggleMuteAudio()}"
+                                                ?disabled=${this._muteDisabled()}
+                                    >
+                                        <ha-icon id="muteaudio-icon" icon="hass:microphone"></ha-icon>
+                                        MUTE
+                                    </button
+                                    >
+                                `
+                                : html``}
+
+                        <button @click="${this._hangup}"
+                                class="hangup-btn"
+                                ?disabled=${this._hangupDisabled()}
                         >
-                            <ha-icon icon="hass:phone-hangup"></ha-icon>
-                            DESLIGAR
-                        </mwc-button
+                            <ha-icon icon="hass:phone-hangup"></ha-icon> DESLIGAR
+                        </button>
+                    </div>
+
+                    <div class="ze-secondary-button-container">
+                        <button
+                                @click="${() => this._button(this.config.gateEntity)}"
+                        ><ha-icon icon="mdi:door-closed-lock"></ha-icon> ABRIR PORTAO
+                        </button
                         >
                     </div>
 
-                    <ha-camera-stream
-                            class="primary-camera"
-                            allow-exoplayer
-                            muted
-                            .hass=${this.hass}
-                            .stateObj=${this.hass.states[this.config.doorbellCamera]}
-                    ></ha-camera-stream>
+                    <div class="primary-camera-container">
+                        <ha-camera-stream
+                                class="primary-camera"
+                                allow-exoplayer
+                                muted
+                                .hass=${this.hass}
+                                .stateObj=${this.hass.states[this.config.doorbellCamera]}
+                        ></ha-camera-stream>
+                    </div>
 
                     <ha-camera-stream
                             class="secondary-camera"
@@ -561,7 +651,20 @@ class ZeSipDoorbellCard extends LitElement {
         }
     }
 
+    private _acceptDisabled() {
+        return this.hass.states[this.config.ringStateEntity].state === "off" && this.hass.states[this.config.callStateEntity].state === "off";
+    }
+
+    private _muteDisabled() {
+        return !this.sipPhoneSession;
+    }
+
+    private _hangupDisabled() {
+        return !this.sipPhoneSession && this.hass.states[this.config.ringStateEntity].state === "off" && this.hass.states[this.config.callStateEntity].state === "off";
+    }
+
     async _call(extension: string | null) {
+        console.log("call");
         this.ring("ringbacktone");
         this.setCallStatus("Calling...");
         if (this.sipPhone) {
@@ -573,17 +676,18 @@ class ZeSipDoorbellCard extends LitElement {
     }
 
     async _hangup() {
+        console.log("hangup");
+        await this._button(this.config.rejectEntity);
         this.sipPhoneSession?.terminate();
-
-        this._button(this.config.rejectEntity);
-
     }
 
     async _ignore() {
-        this._button(this.config.ignoreEntity);
+        console.log("ignore");
+        await this._button(this.config.ignoreEntity);
     }
 
     async _toggleMuteAudio() {
+        console.log("mute");
         if (this.sipPhoneSession?.isMuted().audio) {
             this.sipPhoneSession?.unmute({video: false, audio: true});
             this.renderRoot.querySelector("#muteaudio-icon").icon = "hass:microphone";
